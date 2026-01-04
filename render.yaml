@@ -10,11 +10,11 @@ services:
           name: pyrus-scheduler-db
           property: connectionString
       - key: SECRET_KEY
-        generateValue: true
+        value: "change-this-to-random-secret-key-in-production"
       - key: RENDER
-        value: true
+        value: "true"
       - key: WEB_CONCURRENCY
-        value: 2
+        value: "2"
 
   - type: worker
     name: pyrus-scheduler-worker
@@ -27,9 +27,9 @@ services:
           name: pyrus-scheduler-db
           property: connectionString
       - key: SECRET_KEY
-        syncValue: true
+        value: "change-this-to-random-secret-key-in-production"
       - key: RENDER
-        value: true
+        value: "true"
 
 databases:
   - name: pyrus-scheduler-db
