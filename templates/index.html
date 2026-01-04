@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+
+{% block title %}Управление распределением задач{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary bg-gradient">
+                <h4 class="mb-0">
+                    <i class="bi bi-gear me-2"></i>Статус системы
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <h5>Статус скрипта:</h5>
+                        <div class="d-flex align-items-center">
+                            {% if script_status.is_running %}
+                                <span class="badge bg-success fs-6 me-3 px-3 py-2">АКТИВЕН</span>
+                            {% else %}
+                                <span class="badge bg-danger fs-6 me-3 px-3 py-2">ОСТАНОВЛЕН</span>
+                            {% endif %}
+                            
+                            <div class="btn-group">
+                                <button id="start-btn" class="btn btn-success btn-sm" 
+                                        onclick="controlScript('start')" 
+                                        {% if script_status.is_running %}disabled{% endif %}>
+                                    <i class="bi bi-play-circle me-1"></i>Запустить
+                                </button>
+                                <button id="stop-btn" class="btn btn-danger btn-sm" 
+                                        onclick="controlScript('stop')"
+                                        {% if not script_status.is_running %}disabled{% endif %}>
+                                    <i class="bi bi-stop-circle me-1"></i>Остановить
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button class="btn btn-outline-info btn-sm" onclick="runDistribution()">
+                                <i class="bi bi-play me-1"></i>Запустить распределение сейчас
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4 mb-3 mb-md-0">
+                        <h5>Системная информация:</h5>
+                        <div class="small">
+                            <div><i class="bi bi-clock me-1"></i>Рабочее время: 8:30 - 20:00</div>
+                            <div><i class="bi bi-people me-1"></i>Работает технологов: <span id="working-count">0</span></div>
+                            <div><i class="bi bi-check-circle me-1"></i>В рабочее время: <span id="within-hours">нет</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <h5>Текущее время (Samara):</h5>
+                        <h3 class="text-primary fw-bold" id="current-time-display">{{ current_time }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8 mb-4">
+        <div class="card">
+            <div class="card-header bg-secondary bg-gradient">
+                <h4 class="mb-0">
+                    <i class="bi bi-people me-2"></i>Управление технологами на сегодня
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Технолог</th>
+                                <th>Работает сегодня</th>
+                                <th>Начало</th>
+                                <th>Окончание</th>
+                                <th>Доступен</th>
+                                <th>Задач сегодня</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-table-body">
+                            {% for tech in schedule %}
+                            <tr class="tech-card" id="row-{{ tech.email }}">
+                                <td>
+                                    <div class="fw-bold">{{ tech.name }}</div>
+                                    <div class="small text-muted">{{ tech.email }}</div>
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input working-today" 
+                                               type="checkbox" 
+                                               data-email="{{ tech.email }}"
+                                               id="work-{{ tech.id }}"
+                                               {% if tech.working_today %}checked{% endif %}>
+                                    </div>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control time-input start-hour" 
+                                           data-email="{{ tech.email }}"
+                                           min="0" max="23" 
+                                           value="{{ tech.start_hour }}"
+                                           onchange="updateTimeValidation(this)">
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control time-input end-hour" 
+                                           data-email="{{ tech.email }}"
+                                           min="0" max="23" 
+                                           value="{{ tech.end_hour }}"
+                                           onchange="updateTimeValidation(this)">
+                                </td>
+                                <td>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input available" 
+                                               type="checkbox" 
+                                               data-email="{{ tech.email }}"
+                                               id="avail-{{ tech.id }}"
+                                               {% if tech.available %}checked{% endif %}>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info badge-task-count">{{ tech.task_count }}</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm save-btn" 
+                                            data-email="{{ tech.email }}"
+                                            onclick="saveChanges('{{ tech.email }}')">
+                                        <i class="bi bi-save me-1"></i>Сохранить
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mt-3 d-flex justify-content-between align-items-center">
+                    <button class="btn btn-warning" onclick="saveAllChanges()">
+                        <i class="bi bi-save-all me-1"></i>Сохранить все изменения
+                    </button>
+                    <small class="text-muted">Изменения применяются сразу для текущего дня</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-info bg-gradient">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check me-2"></i>Последние логи системы
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="logs-container" style="max-height: 300px; overflow-y: auto;">
+                    {% for log in recent_logs %}
+                    <div class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <small class="log-{{ log.level }}">{{ log.level|upper }}</small>
+                            <small class="text-muted">{{ log.created_at.strftime('%H:%M:%S') }}</small>
+                        </div>
+                        <div class="small mt-1">{{ log.message }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="card-footer text-end py-2">
+                <button class="btn btn-outline-danger btn-sm" onclick="clearLogs()">
+                    <i class="bi bi-trash me-1"></i>Очистить старые логи
+                </button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-success bg-gradient">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle me-2"></i>Инструкция
+                </h5>
+            </div>
+            <div class="card-body">
+                <ol class="small">
+                    <li class="mb-2">Отметьте галочкой технологов, которые работают сегодня</li>
+                    <li class="mb-2">Укажите время начала и окончания работы (целые числа 0-23)</li>
+                    <li class="mb-2">Нажмите "Сохранить" для каждого или "Сохранить все изменения"</li>
+                    <li class="mb-2">Нажмите "Запустить" для начала автоматического распределения</li>
+                    <li class="mb-2">Система будет распределять задачи каждую минуту с 8:30 до 20:00</li>
+                    <li>Максимум 20 задач на одного технолога в день</li>
+                </ol>
+                <div class="alert alert-warning small mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Важно:</strong> Изменения сохраняются только на текущий день. Завтра нужно будет снова настроить расписание.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let autoRefreshInterval;
+    
+    // Включение/выключение автообновления
+    document.getElementById('auto-refresh').addEventListener('change', function(e) {
+        if (e.target.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+    
+    function startAutoRefresh() {
+        autoRefreshInterval = setInterval(updateStatus, 10000); // Каждые 10 секунд
+        console.log('Автообновление включено');
+    }
+    
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            console.log('Автообновление выключено');
+        }
+    }
+    
+    // Обновление времени на странице
+    function updatePageTime() {
+        const now = new Date();
+        const options = { 
+            timeZone: 'Europe/Samara',
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        };
+        const timeString = new Intl.DateTimeFormat('ru-RU', options).format(now);
+        document.getElementById('current-time-display').textContent = timeString;
+    }
+    
+    setInterval(updatePageTime, 1000);
+    
+    // Валидация времени
+    function updateTimeValidation(input) {
+        const row = input.closest('tr');
+        const startHour = parseInt(row.querySelector('.start-hour').value);
+        const endHour = parseInt(row.querySelector('.end-hour').value);
+        
+        if (startHour >= endHour) {
+            input.classList.add('is-invalid');
+            showToast('Ошибка', 'Время окончания должно быть больше времени начала', 'danger');
+        } else {
+            input.classList.remove('is-invalid');
+        }
+    }
+    
+    // Сохранить изменения для одного технолога
+    function saveChanges(email) {
+        const row = document.getElementById(`row-${email}`);
+        const workingToday = row.querySelector('.working-today').checked;
+        const startHour = parseInt(row.querySelector('.start-hour').value);
+        const endHour = parseInt(row.querySelector('.end-hour').value);
+        const available = row.querySelector('.available').checked;
+        
+        // Валидация
+        if (startHour >= endHour) {
+            showToast('Ошибка', 'Время окончания должно быть больше времени начала', 'danger');
+            return;
+        }
+        
+        const data = {
+            email: email,
+            working_today: workingToday,
+            start_hour: startHour,
+            end_hour: endHour,
+            available: available
+        };
+        
+        fetch('/api/update_schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Успешно', 'Изменения сохранены', 'success');
+                updateStatus();
+            } else {
+                showToast('Ошибка', data.error || 'Ошибка сохранения', 'danger');
+            }
+        })
+        .catch(error => {
+            showToast('Ошибка', 'Ошибка соединения', 'danger');
+        });
+    }
+    
+    // Сохранить все изменения
+    function saveAllChanges() {
+        const rows = document.querySelectorAll('#schedule-table-body tr');
+        let savedCount = 0;
+        let errors = [];
+        
+        rows.forEach(row => {
+            const email = row.querySelector('[data-email]').dataset.email;
+            const startHour = parseInt(row.querySelector('.start-hour').value);
+            const endHour = parseInt(row.querySelector('.end-hour').value);
+            
+            if (startHour >= endHour) {
+                errors.push(`Неверное время для ${email}`);
+                return;
+            }
+            
+            saveChanges(email);
+            savedCount++;
+        });
+        
+        if (errors.length > 0) {
+            showToast('Ошибка', errors.join(', '), 'danger');
+        } else {
+            showToast('Успешно', `Сохранено ${savedCount} записей`, 'success');
+        }
+    }
+    
+    // Управление скриптом
+    function controlScript(action) {
+        fetch('/api/control_script', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Успешно', data.message, 'success');
+                updateStatus();
+            } else {
+                showToast('Ошибка', data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showToast('Ошибка', 'Ошибка соединения', 'danger');
+        });
+    }
+    
+    // Запустить распределение вручную
+    function runDistribution() {
+        fetch('/api/run_distribution', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Успешно', data.message, 'success');
+                updateStatus();
+            } else {
+                showToast('Ошибка', data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showToast('Ошибка', 'Ошибка соединения', 'danger');
+        });
+    }
+    
+    // Очистка логов
+    function clearLogs() {
+        if (!confirm('Удалить логи старше 7 дней?')) return;
+        
+        fetch('/api/clear_logs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Успешно', data.message, 'success');
+                updateStatus();
+            } else {
+                showToast('Ошибка', data.error, 'danger');
+            }
+        })
+        .catch(error => {
+            showToast('Ошибка', 'Ошибка соединения', 'danger');
+        });
+    }
+    
+    // Обновление статуса
+    function updateStatus() {
+        fetch('/api/get_status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Обновляем статус скрипта
+                const scriptStatus = data.script_status;
+                const startBtn = document.getElementById('start-btn');
+                const stopBtn = document.getElementById('stop-btn');
+                
+                if (scriptStatus.is_running) {
+                    startBtn.disabled = true;
+                    stopBtn.disabled = false;
+                } else {
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                }
+                
+                // Обновляем расписание
+                data.schedule.forEach(tech => {
+                    const row = document.getElementById(`row-${tech.email}`);
+                    if (row) {
+                        row.querySelector('.working-today').checked = tech.working_today;
+                        row.querySelector('.start-hour').value = tech.start_hour;
+                        row.querySelector('.end-hour').value = tech.end_hour;
+                        row.querySelector('.available').checked = tech.available;
+                        
+                        // Обновляем счетчик задач
+                        const badge = row.querySelector('.badge-task-count');
+                        if (badge) {
+                            badge.textContent = tech.task_count;
+                        }
+                    }
+                });
+                
+                // Обновляем системную информацию
+                document.getElementById('working-count').textContent = 
+                    data.system_status.working_technologists || 0;
+                document.getElementById('within-hours').textContent = 
+                    data.system_status.within_work_hours ? 'да' : 'нет';
+                
+                // Обновляем логи
+                const logsContainer = document.getElementById('logs-container');
+                if (logsContainer && data.recent_logs) {
+                    logsContainer.innerHTML = '';
+                    data.recent_logs.forEach(log => {
+                        const logItem = document.createElement('div');
+                        logItem.className = 'list-group-item list-group-item-action';
+                        logItem.innerHTML = `
+                            <div class="d-flex w-100 justify-content-between">
+                                <small class="log-${log.level}">${log.level.toUpperCase()}</small>
+                                <small class="text-muted">${log.time}</small>
+                            </div>
+                            <div class="small mt-1">${log.message}</div>
+                        `;
+                        logsContainer.appendChild(logItem);
+                    });
+                }
+            }
+        })
+        .catch(error => console.error('Ошибка обновления статуса:', error));
+    }
+    
+    // Запускаем автообновление
+    startAutoRefresh();
+    
+    // Первоначальная загрузка
+    updateStatus();
+</script>
+{% endblock %}
